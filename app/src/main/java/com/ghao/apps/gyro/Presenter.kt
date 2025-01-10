@@ -6,12 +6,16 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.runtime.Stable
+import com.ghao.apps.gyro.util.MyFFT
+import com.ghao.apps.gyro.util.Normalizer
 import com.ghao.apps.gyro.util.RollingStats
+import com.ghao.apps.gyro.util.WavFileWriter
+import com.ghao.apps.gyro.util.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.apache.commons.math3.transform.DftNormalization
-import org.apache.commons.math3.transform.FastFourierTransformer
-import org.apache.commons.math3.transform.TransformType
+import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
 /**
@@ -20,13 +24,17 @@ import kotlin.math.sqrt
  * For gyroscope-based systems, focus on the 85–255 Hz range, as this is most viable given hardware constraints.
  */
 @Stable
-class Presenter(context: Context) {
+class Presenter(private val context: Context) {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+    private val wavFileWriter = WavFileWriter(context)
+    private var fileNameNumber = 0
 
     private val rollingStats = RollingStats(430)
     private var count = 0
     private var ts = 0L
+
+    private val cache = mutableListOf<Float>()
 
     private val gyroscopeListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -35,6 +43,7 @@ class Presenter(context: Context) {
             val z = event.values[2]
             val magnitude = sqrt(x * x + y * y + z * z)
             rollingStats.add(magnitude)
+            cache.add(magnitude)
 
             _uiState.value = _uiState.value
                 .copy(
@@ -53,6 +62,7 @@ class Presenter(context: Context) {
                 _uiState.value = _uiState.value.copy(freq = count)
                 count = 0
                 ts = current
+                // log { "FFT: ${rollingStats.performFFT().asList()}" }
             } else {
                 count++
             }
@@ -79,16 +89,18 @@ class Presenter(context: Context) {
         rollingStats.reset()
         count = 0
         ts = 0L
+
+        CoroutineScope(Dispatchers.IO).launch {
+            log { "Recorded: ${cache.toList()}" }
+            // val normalized = wavFileWriter.bandPassFilter300to3400(Normalizer.normalize(cache).toFloatArray())
+            // log { "FFT: ${MyFFT.performFFT(normalized.toList()).toList()}" }
+            wavFileWriter.writeToWav(cache.toFloatArray(), "gyro_${fileNameNumber++}")
+            cache.clear()
+        }
     }
 
     fun dispose() {
         stopRecording()
-    }
-
-    private fun performFFT(data: DoubleArray): DoubleArray {
-        val transformer = FastFourierTransformer(DftNormalization.STANDARD)
-        val transformed = transformer.transform(data, TransformType.FORWARD)
-        return transformed.map { it.abs() }.toDoubleArray() // Extract magnitudes
     }
 }
 

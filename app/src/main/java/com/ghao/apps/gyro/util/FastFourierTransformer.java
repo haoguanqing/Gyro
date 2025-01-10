@@ -1,7 +1,8 @@
-package com.ghao.apps.gyro;
+package com.ghao.apps.gyro.util;
 
 import java.util.Arrays;
 
+// See [MyFFT]
 public class FastFourierTransformer {
 
     public static void transform(double[] inputData) {

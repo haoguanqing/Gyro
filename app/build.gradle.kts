@@ -51,7 +51,7 @@ dependencies {
 
     implementation(libs.commons.math3)
     implementation(libs.tarsos.dsp.core)
-    implementation(libs.tarsos.dsp.jvm)
+    implementation(libs.tarsos.dsp.jvm) // Can't use WavFileWriter because some java libs are not included in Android runtime
 
     compileOnly(libs.jtransc.rt)
 

@@ -1,5 +1,10 @@
 package com.ghao.apps.gyro.util
 
+import be.tarsos.dsp.util.fft.FloatFFT
+import org.apache.commons.math3.transform.DftNormalization
+import org.apache.commons.math3.transform.FastFourierTransformer
+import org.apache.commons.math3.transform.TransformType
+
 class RollingStats(private val size: Int) {
     private val values = ArrayDeque<Float>()
     private val minQueue = ArrayDeque<Float>()
@@ -46,6 +51,18 @@ class RollingStats(private val size: Int) {
 
     fun getMax(): Float? {
         return maxQueue.firstOrNull()
+    }
+
+    fun performFFT(): FloatArray {
+        return MyFFT.performFFT(values)
+    }
+
+    // java_vm_ext.cc:598] JNI DETECTED ERROR IN APPLICATION: JNI CallObjectMethodV called with pending exception org.apache.commons.math3.exception.MathIllegalArgumentException:
+    // java_vm_ext.cc:598]   at void org.apache.commons.math3.transform.FastFourierTransformer.transformInPlace(double[][], org.apache.commons.math3.transform.DftNormalization, org.apache.commons.math3.transform.TransformType) (FastFourierTransformer.java:228)
+    private fun performFFT2(data: DoubleArray): DoubleArray {
+        val transformer = FastFourierTransformer(DftNormalization.STANDARD)
+        val transformed = transformer.transform(data, TransformType.FORWARD)
+        return transformed.map { it.abs() }.toDoubleArray() // Extract magnitudes
     }
 
     fun reset() {
